@@ -1,7 +1,10 @@
 import * as http from "http";
 
 type Handler = (
-  req: http.IncomingMessage,
+  req: http.IncomingMessage & {
+    params: Record<string, string> | undefined;
+    body: unknown;
+  },
   res: http.ServerResponse
 ) => Promise<http.ServerResponse> | http.ServerResponse;
 
@@ -20,6 +23,7 @@ interface IRaw {
 
 export default class Raw implements IRaw {
   private _endpoints: Endpoint[] = [];
+  private _httpServer: http.Server | undefined;
 
   public set(method: Method, route: string, handler: Handler) {
     const paramsNames = route.split("/").filter((el) => el.startsWith("$"));
@@ -29,6 +33,26 @@ export default class Raw implements IRaw {
     }
 
     this._endpoints.push({ method, route, handler });
+  }
+
+  private _getReqParams(reqUrl: string, endpointRoute: string) {
+    if (!endpointRoute.includes("$")) return;
+
+    const splitReqUrl = reqUrl.split("/");
+    const splitEndpointRoute = endpointRoute.split("/");
+
+    const paramsNames = splitEndpointRoute.filter((el) => el.startsWith("$"));
+    const paramsIndexes = paramsNames.map((prop) =>
+      splitEndpointRoute.indexOf(prop)
+    );
+
+    const params: Record<string, string> = {};
+
+    paramsIndexes.forEach((index) => {
+      params[splitEndpointRoute[index].slice(1)] = splitReqUrl[index];
+    });
+
+    return params;
   }
 
   private _areParamsEquivalent(reqUrl: string, endpointRoute: string) {
@@ -48,43 +72,56 @@ export default class Raw implements IRaw {
     return areRoutesWithoutParamEqual;
   }
 
+  private _requestEndpoint(reqUrl: string): Endpoint | undefined {
+    const endpointsWithoutParams = this._endpoints.filter(
+      (endpoint) => !endpoint.route.includes("$")
+    );
+    const endpointsWithParams = this._endpoints.filter((endpoint) =>
+      endpoint.route.includes("$")
+    );
+
+    const endpointWithoutParamsRequested = endpointsWithoutParams.find(
+      (endpoint) => endpoint.route.toLowerCase() === reqUrl.toLowerCase()
+    );
+
+    if (endpointWithoutParamsRequested) {
+      return endpointWithoutParamsRequested;
+    } else {
+      const endpointWithParamsRequested = endpointsWithParams.find((endpoint) =>
+        this._areParamsEquivalent(
+          reqUrl.toLowerCase(),
+          endpoint.route.toLowerCase()
+        )
+      );
+
+      return endpointWithParamsRequested;
+    }
+  }
+
   public init(port: number) {
-    http
+    this._httpServer = http
       .createServer((req, res) => {
         if (!req.url) return;
 
-        const endpointsWithoutParams = this._endpoints.filter(
-          (endpoint) => !endpoint.route.includes("$")
-        );
-        const endpointsWithParams = this._endpoints.filter((endpoint) =>
-          endpoint.route.includes("$")
-        );
-
-        let endpointRequested: Endpoint | undefined;
-
-        const endpointWithoutParamsRequested = endpointsWithoutParams.find(
-          (endpoint) => endpoint.route.toLowerCase() === req.url?.toLowerCase()
-        );
-
-        if (endpointWithoutParamsRequested) {
-          endpointRequested = endpointWithoutParamsRequested;
-        } else {
-          const endpointWithParamsRequested = endpointsWithParams.find(
-            (endpoint) =>
-              this._areParamsEquivalent(
-                req.url!.toLowerCase(),
-                endpoint.route.toLowerCase()
-              )
-          );
-
-          endpointRequested = endpointWithParamsRequested;
-        }
+        const endpointRequested = this._requestEndpoint(req.url);
 
         if (!endpointRequested) {
           return res.writeHead(404).end();
         }
 
-        endpointRequested.handler(req, res);
+        const reqParams = this._getReqParams(req.url, endpointRequested.route);
+        let reqBody: unknown;
+
+        req
+          .on("data", (data) => {
+            reqBody = JSON.parse(data);
+          })
+          .on("end", () => {
+            endpointRequested.handler(
+              Object.assign(req, { body: reqBody, params: reqParams }),
+              res
+            );
+          });
       })
       .listen(port, () => console.log("Server running on " + port));
   }
