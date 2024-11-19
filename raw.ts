@@ -18,12 +18,41 @@ export type Endpoint = {
 
 interface IRaw {
   set: (method: Method, route: string, handler: Handler) => void;
-  init: (port: number) => void;
+  listen: (port: number, callback: () => void) => void;
 }
 
 export default class Raw implements IRaw {
   private _endpoints: Endpoint[] = [];
-  private _httpServer: http.Server | undefined;
+  private _httpServer: http.Server;
+
+  constructor() {
+    this._httpServer = http.createServer((req, res) => {
+      if (!req.url) return;
+
+      const endpointRequested = this._requestEndpoint(
+        req.url,
+        req.method ?? "GET"
+      );
+
+      if (!endpointRequested) {
+        return res.writeHead(404).end();
+      }
+
+      const reqParams = this._getReqParams(req.url, endpointRequested.route);
+      let reqBody: unknown;
+
+      req
+        .on("data", (data) => {
+          reqBody = JSON.parse(data);
+        })
+        .on("end", () => {
+          endpointRequested.handler(
+            Object.assign(req, { body: reqBody, params: reqParams }),
+            res
+          );
+        });
+    });
+  }
 
   public set(method: Method, route: string, handler: Handler) {
     const paramsNames = route.split("/").filter((el) => el.startsWith("$"));
@@ -72,7 +101,10 @@ export default class Raw implements IRaw {
     return areRoutesWithoutParamEqual;
   }
 
-  private _requestEndpoint(reqUrl: string): Endpoint | undefined {
+  private _requestEndpoint(
+    reqUrl: string,
+    reqMethod: string
+  ): Endpoint | undefined {
     const endpointsWithoutParams = this._endpoints.filter(
       (endpoint) => !endpoint.route.includes("$")
     );
@@ -81,48 +113,27 @@ export default class Raw implements IRaw {
     );
 
     const endpointWithoutParamsRequested = endpointsWithoutParams.find(
-      (endpoint) => endpoint.route.toLowerCase() === reqUrl.toLowerCase()
+      (endpoint) =>
+        endpoint.route.toLowerCase() === reqUrl.toLowerCase() &&
+        endpoint.method.toLowerCase() === reqMethod.toLowerCase()
     );
 
     if (endpointWithoutParamsRequested) {
       return endpointWithoutParamsRequested;
     } else {
-      const endpointWithParamsRequested = endpointsWithParams.find((endpoint) =>
-        this._areParamsEquivalent(
-          reqUrl.toLowerCase(),
-          endpoint.route.toLowerCase()
-        )
+      const endpointWithParamsRequested = endpointsWithParams.find(
+        (endpoint) =>
+          this._areParamsEquivalent(
+            reqUrl.toLowerCase(),
+            endpoint.route.toLowerCase()
+          ) && endpoint.method.toLowerCase() === reqMethod.toLowerCase()
       );
 
       return endpointWithParamsRequested;
     }
   }
 
-  public init(port: number) {
-    this._httpServer = http
-      .createServer((req, res) => {
-        if (!req.url) return;
-
-        const endpointRequested = this._requestEndpoint(req.url);
-
-        if (!endpointRequested) {
-          return res.writeHead(404).end();
-        }
-
-        const reqParams = this._getReqParams(req.url, endpointRequested.route);
-        let reqBody: unknown;
-
-        req
-          .on("data", (data) => {
-            reqBody = JSON.parse(data);
-          })
-          .on("end", () => {
-            endpointRequested.handler(
-              Object.assign(req, { body: reqBody, params: reqParams }),
-              res
-            );
-          });
-      })
-      .listen(port, () => console.log("Server running on " + port));
+  public listen(port: number, callback: () => void) {
+    this._httpServer.listen(port, callback);
   }
 }
