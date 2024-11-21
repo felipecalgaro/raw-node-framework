@@ -1,27 +1,7 @@
 import * as http from "http";
+import { Endpoint, Handler, Method } from "./types/endpoint";
 
-type Handler = (
-  req: http.IncomingMessage & {
-    params: Record<string, string> | undefined;
-    body: unknown;
-  },
-  res: http.ServerResponse
-) => Promise<http.ServerResponse> | http.ServerResponse;
-
-type Method = "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
-
-export type Endpoint = {
-  method: Method;
-  route: string;
-  handler: Handler;
-};
-
-interface IRaw {
-  set: (method: Method, route: string, handler: Handler) => void;
-  listen: (port: number, callback: () => void) => void;
-}
-
-export default class Raw implements IRaw {
+export default class Raw {
   private _endpoints: Endpoint[] = [];
   private _httpServer: http.Server;
 
@@ -30,8 +10,8 @@ export default class Raw implements IRaw {
       if (!req.url) return;
 
       const endpointRequested = this._requestEndpoint(
-        req.url,
-        req.method ?? "GET"
+        req.method ?? "GET",
+        req.url
       );
 
       if (!endpointRequested) {
@@ -102,8 +82,8 @@ export default class Raw implements IRaw {
   }
 
   private _requestEndpoint(
-    reqUrl: string,
-    reqMethod: string
+    reqMethod: string,
+    reqUrl: string
   ): Endpoint | undefined {
     const endpointsWithoutParams = this._endpoints.filter(
       (endpoint) => !endpoint.route.includes("$")
