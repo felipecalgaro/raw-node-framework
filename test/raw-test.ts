@@ -7,7 +7,7 @@ type Handler = (req: {
   headers: Record<string, string | string[] | undefined> | undefined;
 }) => any;
 
-type Endpoint = {
+export type TestEndpoint = {
   method: Method;
   route: string;
   handler: Handler;
@@ -19,8 +19,8 @@ type RequestConfig = {
   headers?: Record<string, string>;
 };
 
-export class RawTestRepository {
-  private _router = new Router<Endpoint>([]);
+export class RawTest {
+  constructor(private _router = new Router<TestEndpoint>()) {}
 
   public set(method: Method, route: string, handler: Handler) {
     const paramsNames = route.split("/").filter((el) => el.startsWith("$"));
