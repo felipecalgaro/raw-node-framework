@@ -51,11 +51,31 @@ describe("router", () => {
 });
 
 describe("raw", () => {
+  test("endpoint with repeated params is not settable", () => {
+    assert.throws(
+      () => {
+        raw.set("GET", "/test/$param1/$param2/$param1", (req) => {
+          return JSON.stringify(true);
+        });
+      },
+      { message: "Endpoint parameters must be uniquely named." }
+    );
+  });
+
   test("routing system is successful", () => {
     const response = raw.fetch("/test/route");
     const data = JSON.parse(response);
 
     assert.strictEqual(JSON.stringify(data), JSON.stringify({ message: "hi" }));
+  });
+
+  test("non-existing endpoint is not fetchable", () => {
+    assert.throws(
+      () => {
+        raw.fetch("/unexisting/endpoint");
+      },
+      { message: "404" }
+    );
   });
 
   test("params, body and headers are accessible", () => {
