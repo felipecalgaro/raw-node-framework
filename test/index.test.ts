@@ -95,4 +95,41 @@ describe("raw", () => {
       })
     );
   });
+
+  test("middlewares are appliable", () => {
+    let middlewareCount = 0;
+    raw.applyMiddleware((req, next) => {
+      middlewareCount++;
+      next();
+    });
+    raw.applyMiddleware(
+      (req, next) => {
+        middlewareCount++;
+        next();
+      },
+      { endpoint: "/middleware" }
+    );
+    raw.applyMiddleware(
+      (req, next) => {
+        middlewareCount++;
+        next();
+      },
+      { endpoint: "/" }
+    );
+
+    raw.set("GET", "/middleware", (req) => {
+      return JSON.stringify({ middlewareCount });
+    });
+
+    const response = raw.fetch("/middleware");
+
+    const data = JSON.parse(response);
+
+    assert.strictEqual(
+      JSON.stringify(data),
+      JSON.stringify({
+        middlewareCount: 2,
+      })
+    );
+  });
 });
