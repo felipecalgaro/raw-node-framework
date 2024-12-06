@@ -1,11 +1,11 @@
 import * as http from "http";
 
-type RawRequest = http.IncomingMessage & {
+export type RawRequest = http.IncomingMessage & {
   params: Record<string, string> | undefined;
   body: unknown;
 };
 
-type RawResponse = http.ServerResponse;
+export type RawResponse = http.ServerResponse;
 
 export type Handler = (
   req: RawRequest,
