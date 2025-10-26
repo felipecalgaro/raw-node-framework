@@ -1,5 +1,14 @@
 # ⚙️ Raw Node Framework
 
+## What I Learned
+
+- How Node frameworks work under the hood
+- How to implement middleware functionality from scratch using recursion
+- How to implement the logic behind selecting an endpoint given its route, params, method or all together
+  - E.g., the endpoint _GET /$userId/example/$postId_ should serve the request _GET /1/example/2_
+
+## Overview
+
 This is a project developed for studying purposes. Curious about how node frameworks such as _Express_ work, I tried to create my own from scratch. After all, just as Feynman once said, _"What I cannot create, I do not understand"_.
 
 ## Tests
@@ -12,10 +21,10 @@ Two classes are implemented: Raw and Router. The first one deals with all the ht
 
 <img width="2960" alt="raw-framework" src="https://github.com/user-attachments/assets/64a5b1bb-b40f-4435-ae7c-03b1f9b75dd4" />
 
-
 ## Example
 
 - Code:
+
 ```js
 import Raw from "./raw";
 
@@ -47,6 +56,7 @@ raw.listen(3333, () => {
 ```
 
 - HTTP Requests:
+
 ```http
 POST http://localhost:3333/users
 {
@@ -59,6 +69,7 @@ GET http://localhost:3333/users/123
 ```
 
 - Result:
+
 ```json
 {
   "body": {
